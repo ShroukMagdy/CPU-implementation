@@ -1,0 +1,515 @@
+module SC(CLK,CLR,counter);
+input CLK;
+input CLR;
+output [4:0]counter;
+wire CLK;
+wire CLR;
+reg[4:0]counter;
+always@(posedge CLK)
+begin
+if (CLR==1)begin
+counter<=0;
+end
+else if (CLR==0&&counter==5'b11111)begin
+counter<=0;
+end
+else if (CLR==0)begin 
+counter<=counter+1; 
+end 
+end
+endmodule
+
+module decoder(datain,T);
+input [4:0]datain;
+output [31:0]T ;
+wire [4:0]datain;
+reg [31:0]T ;
+always@(datain)
+begin
+T=32'd0;
+T[(datain[0]*1)+(datain[1]*2)+(datain[2]*4)+(datain[3]*8)+(datain[4]*16)]=1;
+end
+endmodule
+
+
+module decoder8(datain,T);
+input [2:0]datain;
+output [7:0]T ;
+wire [2:0]datain;
+reg [7:0]T ;
+always@(datain)
+begin
+T=8'b00000000;
+T[(datain[0]*1)+(datain[1]*2)+(datain[2]*4)]=1;
+end
+endmodule 
+
+
+
+module register12(CLK,LD,INR,CLR,Datain,Dataout);
+input CLK;
+input INR;
+input LD;
+input CLR;
+input [11:0]Datain;
+output [11:0]Dataout;
+wire CLK;
+wire LD;
+wire INR;
+wire CLR;
+wire[11:0]Datain;
+reg[11:0]Dataout;
+always@(posedge CLK)
+begin
+if (LD==1'b1)begin
+Dataout<=Datain;
+end
+else if (INR==1'b1)begin
+Dataout<=Dataout+1;
+end
+else if (CLR==1'b1)begin
+Dataout<=0;
+end 
+end
+endmodule  
+
+module register16(CLK,LD,INR,CLR,Datain,Dataout);
+input CLK;
+input INR;
+input LD;
+input CLR;
+input [15:0]Datain;
+output [15:0]Dataout;
+wire CLK;
+wire LD;
+wire INR;
+wire CLR;
+wire[15:0]Datain;
+reg[15:0]Dataout;
+always@(posedge CLK)
+begin
+if (LD==1'b1)begin
+Dataout<=Datain;
+end
+else if (INR==1'b1)begin
+Dataout<=Dataout+1;
+end
+else if (CLR==1'b1)begin
+Dataout<=0;
+end 
+end
+endmodule 
+
+module memory16(address,datain,dataout,R,W,CLK);
+input CLK;
+input R;
+input W;
+input [11:0]address;
+input [15:0]datain;
+output [15:0]dataout;
+wire CLK;
+wire R;
+wire W;
+wire[11:0]address;
+wire[15:0]datain;
+reg[15:0]dataout;
+reg [15:0]memory16[0:4095];
+initial
+begin
+memory16[0]=16'h7800;
+memory16[1]=16'h1006;
+memory16[2]=16'h4004;
+memory16[3]=16'h7001;
+memory16[4]=16'h0007;
+memory16[5]=16'h4003;
+memory16[6]=16'hC1A5;
+memory16[7]=16'h93C6;
+end
+always@(posedge CLK)
+begin
+if (W==1)begin
+memory16 [address]=datain;
+end
+else if (R==1)begin
+dataout=memory16 [address];
+end 
+end
+endmodule
+
+module ALU(select,A,B,E,Result);
+input select;
+input [15:0]A;
+input [15:0]B;
+output E;
+output [15:0]Result;
+wire select;
+reg E;
+wire[15:0]A;
+wire[15:0]B;
+reg[15:0]Result;
+always@(select) 
+begin
+if (select==0)begin
+E<=0;
+Result<=A&B;
+end
+else if (select==1)begin
+E<=0;
+{E,Result}<=A+B;
+end 
+end
+endmodule
+
+module CPU(CLK,reset,out);
+input CLK;
+input reset;
+output [15:0]out;  
+wire CLK;
+wire reset;
+wire [15:0]out; 
+wire [4:0]countertodecoder;
+wire [15:0]IRout;
+wire [31:0]seq;
+wire [11:0]PCout;
+reg [11:0]ARin;
+wire [7:0]decoder8out;
+reg PCinc;
+wire [11:0]ARout;
+reg	 [11:0]memadd;
+reg read; 
+wire [15:0]memout;
+reg [15:0]memin;
+reg [15:0]IRin;
+reg [2:0]decoder8in;
+reg I;
+reg ARinc;
+reg ARld;
+reg [15:0]DRin;
+reg DRld;
+wire [15:0]DRout;
+reg [15:0]A;
+reg [15:0]B;
+reg [15:0]ACin;
+reg ACld;
+wire [15:0]Result;
+reg SCclr;
+reg select;
+wire F;
+reg extra;
+reg write;
+reg [11:0]PCin;
+reg PCld;
+reg DRinc;
+reg ACclr;
+reg E;
+reg ACinc;
+reg S;
+reg IRld;
+register16 AC(.CLK(CLK),.LD(ACld),.INR(ACinc),.CLR(ACclr),.Datain(ACin),.Dataout(out));  
+register16 IR(.CLK(CLK),.LD(IRld),.INR(),.CLR(reset),.Datain(IRin),.Dataout(IRout));
+register16 DR(.CLK(CLK),.LD(DRld),.INR(DRinc),.CLR(reset),.Datain(DRin),.Dataout(DRout));
+register12 PC(.CLK(CLK),.LD(PCld),.INR(PCinc),.CLR(reset),.Datain(PCin),.Dataout(PCout));   
+register12 AR(.CLK(CLK),.LD(ARld),.INR(ARinc),.CLR(reset),.Datain(ARin),.Dataout(ARout));
+SC C(.CLK(CLK),.CLR(SCclr),.counter(countertodecoder));
+decoder d1(.datain(countertodecoder),.T(seq));
+decoder8 d0(.datain(decoder8in),.T(decoder8out));
+memory16 mymemory(.address(memadd),.datain(memin),.dataout(memout),.R(read),.W(write),.CLK(CLK));
+ALU A0(.select(select),.A(A),.B(B),.E(F),.Result(Result)); 
+initial
+begin
+PCin<=12'h000;
+PCld<=1;
+SCclr<=1;
+S<=1;
+end
+always@(posedge CLK)
+begin
+if (S!=0)begin
+SCclr<=0;
+ACld<=0; 
+DRld<=0;
+ARld<=0;
+PCld<=0; 
+PCinc<=0;
+ARinc<=0;
+DRinc<=0;
+read<=0;
+write<=0;
+IRld<=0;
+ACclr<=0;
+
+if (reset==1)begin
+SCclr<=1;
+end
+if (seq[0]==1)begin
+ARin<=PCout;        
+ARld<=1;
+end
+if (seq[1]==1)begin
+PCinc<=1;
+
+end
+if (seq[2]==1)begin
+read<=1;
+memadd<=ARout;
+end
+if (seq[4]==1)begin
+IRin<=memout;
+IRld<=1;
+end
+if (seq[6]==1)begin
+decoder8in<=IRout[14:12];
+I<=IRout[15];
+ARin<=IRout[11:0];
+ARld<=1;
+end
+if (seq[8]==1)begin
+read<=1;
+memadd<=ARout;
+end
+if (seq[8]==1&I==1&decoder8out[7]!=1)begin
+read<=1;
+memadd<=ARout;
+end
+if (seq[10]==1&I==1&decoder8out[7]!=1)begin
+ARin<=memout;
+ARld<=1;
+end
+//////////////////////////////////
+if (seq[12]==1&decoder8out[0]==1)begin 
+memadd<=ARout;
+read<=1;
+end 
+if (seq[14]==1&decoder8out[0]==1)begin 
+DRin<=memout;
+DRld<=1;
+
+end
+if (seq[16]==1&decoder8out[0]==1)begin 
+A<=DRout;
+B<=out;
+select<=0;
+
+end
+if (seq[18]==1&decoder8out[0]==1)begin 
+ACin<=Result;
+ACld<=1;
+end
+
+if (seq[20]==1&decoder8out[0]==1)begin 
+SCclr<=1;
+end
+////////////////////////////
+if (seq[12]==1&decoder8out[1]==1)begin 
+memadd<=ARout;
+read<=1;
+end
+if (seq[14]==1&decoder8out[1]==1)begin 
+DRin<=memout;
+DRld<=1;
+end
+if (seq[16]==1&decoder8out[1]==1)begin 
+A<=DRout;
+B<=out;
+select<=1;
+end
+if (seq[18]==1&decoder8out[1]==1)begin 
+ACin<=Result;
+E<=F;
+ACld<=1;
+end
+if (seq[20]==1&decoder8out[1]==1)begin 
+SCclr<=1;
+end
+/////////////////////////
+if (seq[12]==1&decoder8out[2]==1)begin 
+memadd<=ARout;
+read<=1;
+end
+if (seq[14]==1&decoder8out[2]==1)begin 
+DRin<=memout;
+DRld<=1;
+end
+if (seq[16]==1&decoder8out[2]==1)begin 
+ACin<=DRout;
+ACld<=1;
+end
+if (seq[18]==1&decoder8out[2]==1)begin 
+SCclr<=1;
+end
+////////////////////////
+if (seq[12]==1&decoder8out[3]==1)begin 
+DRin<=out;
+DRld<=1;
+end
+if (seq[14]==1&decoder8out[3]==1)begin 
+memadd<=ARout;
+write<=1;
+end
+if (seq[16]==1&decoder8out[3]==1)begin 
+memin<=DRout;
+end
+if (seq[18]==1&decoder8out[3]==1)begin 
+SCclr<=1;
+end
+///////////////////////
+if (seq[12]==1&decoder8out[4]==1)begin
+PCin<=ARout;
+PCld<=1;
+end
+if (seq[14]==1&decoder8out[4]==1)begin
+SCclr<=1;
+end
+////////////////
+if (seq[12]==1&decoder8out[5]==1)begin
+memadd<=ARout;
+write<=1;
+end
+if (seq[14]==1&decoder8out[5]==1)begin
+memin<=PCout;
+ARinc<=1;
+end
+if (seq[16]==1&decoder8out[5]==1)begin
+PCin<=ARout;
+PCld<=1;
+end
+if (seq[18]==1&decoder8out[5]==1)begin
+SCclr<=1;
+end
+///////////////
+if (seq[12]==1&decoder8out[6]==1)begin
+memadd<=ARout;
+read<=1;
+end
+if (seq[14]==1&decoder8out[6]==1)begin
+DRin<=memout;
+DRld<=1;
+end 
+if (seq[16]==1&decoder8out[6]==1)begin
+DRinc<=1;
+end
+if (seq[16]==1&decoder8out[6]==1&DRout==0)begin
+DRinc<=1;
+PCinc<=1;
+end      
+if (seq[18]==1&decoder8out[6]==1)begin
+SCclr<=1;
+end
+//////////////
+if (seq[12]==1&decoder8out[7]==1&I==0&IRout[11]==1)begin
+ACclr<=1;    
+end
+if (seq[14]==1&decoder8out[7]==1&I==0&IRout[11]==1)begin
+SCclr<=1;    
+end 
+///////////////////
+if (seq[12]==1&decoder8out[7]==1&I==0&IRout[10]==1)begin
+E<=0;    
+end
+if (seq[13]==1&decoder8out[7]==1&I==0&IRout[10]==1)begin
+SCclr<=1;    
+end 
+////////////////////
+if (seq[12]==1&decoder8out[7]==1&I==0&IRout[9]==1)begin
+ACin<=~out;
+ACld<=1;    
+end
+if (seq[14]==1&decoder8out[7]==1&I==0&IRout[9]==1)begin
+SCclr<=1;    
+end
+////////////////////
+if (seq[12]==1&decoder8out[7]==1&I==0&IRout[8]==1)begin
+E<=~E;    
+end
+if (seq[13]==1&decoder8out[7]==1&I==0&IRout[8]==1)begin
+SCclr<=1;    
+end
+////////////////////
+if (seq[12]==1&decoder8out[7]==1&I==0&IRout[7]==1)begin
+E<=out[0];
+ACin[14:0]<=out[15:1];
+ACin[15]<=E;
+ACld<=1;    
+end
+if (seq[14]==1&decoder8out[7]==1&I==0&IRout[7]==1)begin
+SCclr<=1;    
+end
+////////////////////
+if (seq[12]==1&decoder8out[7]==1&I==0&IRout[6]==1)begin
+ACin[0]<=E;
+E<=out[15];
+ACin[15:1]<=out[14:0];
+ACld<=1;    
+end
+if (seq[14]==1&decoder8out[7]==1&I==0&IRout[6]==1)begin
+SCclr<=1;    
+end 
+////////////////////
+if (seq[12]==1&decoder8out[7]==1&I==0&IRout[5]==1)begin
+ACinc<=1;  
+end
+if (seq[14]==1&decoder8out[7]==1&I==0&IRout[5]==1)begin
+SCclr<=1;    
+end
+////////////////////
+if (seq[12]==1&decoder8out[7]==1&I==0&IRout[4]==1)begin
+if (out[15]==0)begin
+PCinc<=1;
+end
+end
+if (seq[14]==1&decoder8out[7]==1&I==0&IRout[4]==1)begin
+SCclr<=1;    
+end
+////////////////////
+if (seq[12]==1&decoder8out[7]==1&I==0&IRout[3]==1)begin
+if (out[15]==1)begin
+PCinc<=1;
+end   
+end
+if (seq[14]==1&decoder8out[7]==1&I==0&IRout[3]==1)begin
+SCclr<=1;    
+end
+////////////////////
+if (seq[12]==1&decoder8out[7]==1&I==0&IRout[2]==1)begin
+if (out==0)begin
+PCinc<=1;
+end   
+end
+if (seq[14]==1&decoder8out[7]==1&I==0&IRout[2]==1)begin
+SCclr<=1;    
+end
+////////////////////
+if (seq[12]==1&decoder8out[7]==1&I==0&IRout[1]==1)begin
+if (E==0)begin
+PCinc<=1;
+end    
+end
+if (seq[14]==1&decoder8out[7]==1&I==0&IRout[1]==1)begin
+SCclr<=1;    
+end
+////////////////////
+if (seq[12]==1&decoder8out[7]==1&I==0&IRout[0]==1)begin
+S=0;    
+end   
+end
+end
+
+endmodule   
+
+module CPU_tb();
+CPU xy(CLK,reset,out);
+reg CLK,reset;
+wire [15:0]out;
+
+initial begin
+$dumpfile("CPU.vcd");
+$dumpvars;
+$monitor ("CLK=%b,reset=%b,out=%h",CLK,reset,out); 
+CLK=0;
+reset<=0;
+#500 $finish;
+end
+always begin
+#2 CLK=!CLK;
+end 
+endmodule
